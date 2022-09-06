@@ -1,30 +1,28 @@
 package com.example.imagecapture;
 
-import android.Manifest;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-//import java.io.IOException;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
-//import okhttp3.Call;
-//import okhttp3.Callback;
-//import okhttp3.OkHttpClient;
-//import okhttp3.Request;
-//import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -32,6 +30,11 @@ public class MainActivity extends AppCompatActivity {
     ImageView displayImage;
     TextView tempText;
     Spinner categoryDropdown;
+
+    private TextView textView_response;
+
+    private String url = "http://192.168.0.32:5000/";
+    private String POST = "POST";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,85 +47,62 @@ public class MainActivity extends AppCompatActivity {
         tempText = findViewById(R.id.tempText);
         Spinner categoryDropdown = findViewById(R.id.categoryDropdown);
 
-
-        //Camera Permission for first time user
-        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MainActivity.this, new String[]{
-                    Manifest.permission.CAMERA}, 100);
-        }
-
-
-        //Defining Dropdown Categories
-        String[] dropdownItems = new String[]{"Food", "Travel", "Nature", "Vehicles", "Electronics", "Aesthetics"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, dropdownItems);
-        categoryDropdown.setAdapter(adapter);
-
-
-        //OnClick Listener for Capture Button
-        captureButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent captureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        Intent captureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        /*making a post request.*/
+        captureButton.setOnClickListener(view -> {
                 startActivityForResult(captureIntent, 100);
-                captureButton.setVisibility(view.INVISIBLE);
-                categoryDropdown.setVisibility(view.VISIBLE);
-                uploadButton.setVisibility(view.VISIBLE);
-            }
+        captureButton.setVisibility(view.INVISIBLE);
+        categoryDropdown.setVisibility(view.VISIBLE);
+        uploadButton.setVisibility(view.VISIBLE);
         });
 
+        uploadButton.setOnClickListener(view -> {
+                MultipartBody.Builder multipartBodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
 
-        //OnClick Listener for Upload Button
-        String flaskURL = "http://127.0.0.1:5001/";
-        uploadButton.setOnClickListener(new View.OnClickListener() {
+        byte[] byteArray = new byte[0]; //captureIntent.getByteArrayExtra("data");
+        multipartBodyBuilder.addFormDataPart("image", "Android_Flask.jpg", RequestBody.create(MediaType.parse("image/*jpg"), byteArray));
+        RequestBody postBodyImage = multipartBodyBuilder.build();
+        sendRequest(postBodyImage);
+        });
+
+    }
+
+    void sendRequest(RequestBody requestBody) {
+
+        String fullURL = url;
+        Request request;
+
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS).build();
+
+        request = new Request.Builder()
+                .url(fullURL)
+                .post(requestBody)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
             @Override
-            public void onClick(View view) {
-                postRequest("GET",flaskURL);
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Call call, final Response response) {
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        TextView responseText = findViewById(R.id.tempText);
+                        try {
+                            responseText.setText("Server's Response\n" + response.body().string());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
             }
         });
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode == 100){
-            if(data != null) {
-                Bitmap bitmap = (Bitmap) data.getExtras().get("data");
-                displayImage.setImageBitmap(bitmap);
-            }
-        }
-    }
-
-
-    void postRequest(String type, String flaskURL) {
-//        OkHttpClient client = new OkHttpClient();
-//        Request request = new Request
-//                .Builder()
-////                        .post(requestBody)
-//                .url(flaskURL)
-//                .build();
-//        client.newCall(request).enqueue(new Callback() {
-//            @Override
-//            public void onFailure(final Call call, final IOException e) {
-//                e.printStackTrace();
-//            }
-//
-//            @Override
-//            public void onResponse(Call call, final Response response) throws IOException {
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        Log.d("Done", "reponse");
-//                        tempText.setText("Done!");
-//                    }
-//                });
-//            }
-//        });
     }
 }
-
-
-
-
-
-
