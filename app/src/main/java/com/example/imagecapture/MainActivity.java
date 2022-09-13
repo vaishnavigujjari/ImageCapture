@@ -1,6 +1,7 @@
 package com.example.imagecapture;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
@@ -9,6 +10,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -16,6 +18,7 @@ import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -32,6 +35,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import android.graphics.Bitmap;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -40,10 +44,10 @@ public class MainActivity extends AppCompatActivity {
     TextView tempText;
     Spinner categoryDropdown;
     String currentPhotoPath;
-
+    Bitmap uploadImageData;
     private TextView textView_response;
 
-    private String url = "http://10.153.96.6:5000";
+    private String url = "http://10.181.33.231:5000";
     private String POST = "POST";
 
     @Override
@@ -56,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         uploadButton = findViewById(R.id.uploadButton);
         tempText = findViewById(R.id.tempText);
         Spinner categoryDropdown = findViewById(R.id.categoryDropdown);
-
+        uploadImageData = null;
         //Defining Dropdown Categories
         String[] dropdownItems = new String[]{"Food", "Travel", "Nature", "Vehicles", "Electronics", "Aesthetics"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, dropdownItems);
@@ -70,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Intent captureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 uploadIntent[0] = captureIntent;
-                startActivityForResult(captureIntent, 100);
+                startActivityForResult(captureIntent, 102);
                 captureButton.setVisibility(view.INVISIBLE);
                 categoryDropdown.setVisibility(view.VISIBLE);
                 uploadButton.setVisibility(view.VISIBLE);
@@ -79,13 +83,34 @@ public class MainActivity extends AppCompatActivity {
 
         uploadButton.setOnClickListener(view -> {
             MultipartBody.Builder multipartBodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
-            byte[] byteArray = uploadIntent[0].getByteArrayExtra("data");
-            byteArray = new byte[0];
-            multipartBodyBuilder.addFormDataPart("image", "Android_Flask.jpg", RequestBody.create(MediaType.parse("image/*jpg"), byteArray));
+            //byte[] byteArray = (byte[]) uploadIntent[0].getExtras().get("data");
+            //System.out.println(uploadIntent[0].toString());
+            //System.out.println(byteArray.toString());
+            //byteArray =
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Bitmap compressedImage = uploadImageData;
+            compressedImage.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+            byte[] bytes = baos.toByteArray();
+            String imageEncoded = Base64.encodeToString(bytes, Base64.DEFAULT);
+            System.out.println(imageEncoded);
+            multipartBodyBuilder.addFormDataPart("image", "Android_Flask.jpg", RequestBody.create(MediaType.parse("image/*jpg"), imageEncoded));
             RequestBody postBodyImage = multipartBodyBuilder.build();
+            System.out.println(postBodyImage.toString());
             sendRequest(postBodyImage);
         });
 
+    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        System.out.println("running activity result");
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == 102){
+            if(data != null) {
+                Object imageData = data.getExtras().get("data");
+                uploadImageData = (Bitmap) imageData;
+                displayImage.setImageBitmap(uploadImageData);
+            }
+        }
     }
 
     private File createImageFile() throws IOException {
@@ -157,7 +182,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         TextView responseText = findViewById(R.id.tempText);
                         try {
-                            responseText.setText("Server's Response\n" + response.body().string());
+                        responseText.setText("Server's Response\n" + response.body().string());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
