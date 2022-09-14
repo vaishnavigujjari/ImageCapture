@@ -37,6 +37,9 @@ import okhttp3.Response;
 
 import android.graphics.Bitmap;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class MainActivity extends AppCompatActivity {
 
     Button captureButton, uploadButton;
@@ -47,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     Bitmap uploadImageData;
     private TextView textView_response;
 
-    private String url = "http://10.181.33.231:5000";
+    private String url = "http://192.168.0.32:5000/";
     private String POST = "POST";
 
     @Override
@@ -83,29 +86,26 @@ public class MainActivity extends AppCompatActivity {
 
         uploadButton.setOnClickListener(view -> {
             MultipartBody.Builder multipartBodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
-            //byte[] byteArray = (byte[]) uploadIntent[0].getExtras().get("data");
-            //System.out.println(uploadIntent[0].toString());
-            //System.out.println(byteArray.toString());
-            //byteArray =
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Bitmap compressedImage = uploadImageData;
             compressedImage.compress(Bitmap.CompressFormat.JPEG, 100, baos);
             byte[] bytes = baos.toByteArray();
             String imageEncoded = Base64.encodeToString(bytes, Base64.DEFAULT);
-            System.out.println(imageEncoded);
-            multipartBodyBuilder.addFormDataPart("image", "Android_Flask.jpg", RequestBody.create(MediaType.parse("image/*jpg"), imageEncoded));
-            RequestBody postBodyImage = multipartBodyBuilder.build();
-            System.out.println(postBodyImage.toString());
-            sendRequest(postBodyImage);
+            try {
+                sendRequest(imageEncoded);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         });
 
     }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         System.out.println("running activity result");
         super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode == 102){
-            if(data != null) {
+        if (requestCode == 102) {
+            if (data != null) {
                 Object imageData = data.getExtras().get("data");
                 uploadImageData = (Bitmap) imageData;
                 displayImage.setImageBitmap(uploadImageData);
@@ -153,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    void sendRequest(RequestBody requestBody) {
+    void sendRequest(String encodedImage) throws JSONException {
 
         String fullURL = url;
         Request request;
@@ -163,9 +163,16 @@ public class MainActivity extends AppCompatActivity {
                 .readTimeout(10, TimeUnit.SECONDS)
                 .writeTimeout(10, TimeUnit.SECONDS).build();
 
+        JSONObject jsonBody = new JSONObject();
+        jsonBody.put("imageData", encodedImage);
+        jsonBody.put("categoryName", "Nature");
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(JSON, String.valueOf(jsonBody));
+
         request = new Request.Builder()
                 .url(fullURL)
-                .post(requestBody)
+                .post(body)
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -182,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         TextView responseText = findViewById(R.id.tempText);
                         try {
-                        responseText.setText("Server's Response\n" + response.body().string());
+                            responseText.setText("Server's Response\n" + response.body().string());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
